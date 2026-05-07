@@ -7,7 +7,7 @@ const CoursesDisplay = ({ customer }) => {
 
     const fetchCourses = () => {
         // Fetch courses for the given customer ID
-        APIService.getCoursesForCustomer(customer)
+        APIService.getCoursesForCustomer(customer.id)
             .then(courses => {
                 setCourses(courses);
             })
@@ -18,11 +18,15 @@ const CoursesDisplay = ({ customer }) => {
 
     return (
         <div className="courses-display">
-            <h3>Courses for Customer ID: {customer}</h3>
+            <h3>Courses for Customer ID: {customer.id}</h3>
+            <button onClick={fetchCourses}>Load Courses</button>
             {courses.length > 0 ? (
                 <ul>
                     {courses.map(course => (
-                        <li key={course.id}>{course.name}</li>
+                        <div key={course.id}>
+                            <li>{course.course_name}</li>
+                            <li>{course.date_taken}</li>
+                        </div>
                     ))}
                 </ul>
             ) : (

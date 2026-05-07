@@ -3,7 +3,7 @@ import './App.jsx';
 export default class APIService {
     static async fetchCustomers() {
         try {
-            const response = await fetch('/backend/app/routes/customers/getCustomers', {
+            const response = await fetch('/customers/getCustomers', {
                 method: 'GET',
                 headers: {}
             });
@@ -15,8 +15,22 @@ export default class APIService {
         }
     }
 
-    static importCustomersEmail() {
-        return fetch('/backend/app/routes/imports/email', {
+    static async importCustomersEmail() {
+        try {
+            const response = await fetch('/imports/email', {
+                method: 'GET',
+                headers: {}
+            });
+            const emailImports = await response.json();
+            return emailImports;
+        } catch (error) {
+            console.error('Error importing customers:', error);
+            throw error;
+        }
+    }
+
+    static importCustomersDB() {
+        return fetch('/imports/db', {
             method: 'GET',
             headers: {}
         })
@@ -28,7 +42,7 @@ export default class APIService {
     }
 
     static importCustomersDB() {
-        return fetch('/backend/app/routes/imports/db', {
+        return fetch('/imports/db', {
             method: 'GET',
             headers: {}
         })
@@ -40,7 +54,7 @@ export default class APIService {
     }
 
     static importCustomersCSV() {
-        return fetch('/backend/app/routes/imports/csv', {
+        return fetch('/imports/csv', {
             method: 'GET',
             headers: {}
         })
@@ -52,7 +66,7 @@ export default class APIService {
     }
 
     static getCoursesForCustomer(customerId) {
-        return fetch(`/backend/app/routes/courses/${customerId}`, {
+        return fetch(`/customers/getCustomerCourses/${customerId}`, {
             method: 'GET',
             headers: {}
         })

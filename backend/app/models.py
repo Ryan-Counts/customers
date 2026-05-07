@@ -15,11 +15,8 @@ from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
 
-class Base(DeclarativeBase):
-    pass
 
-
-class Customer(Base):
+class Customer(db.Model):
     __tablename__ = "customers"
 
     id         = mapped_column(Integer, primary_key=True)
@@ -37,12 +34,13 @@ class Customer(Base):
     contact_methods: Mapped[List["ContactMethod"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
    
     def to_dict(self, include_related=False):
-        d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        d = dict(id=self.id, name=self.name, email=self.email, phone=self.phone, company=self.company,
+                 status=self.status, source=self.source, source_ref=self.source_ref)
         if include_related:
             d["contact_methods"] = [cm.to_dict() for cm in self.contact_methods]
         return d
 
-class CoursesTaken(Base):
+class CoursesTaken(db.Model):
     __tablename__ = "courses_taken"
 
     id           = mapped_column(Integer, primary_key=True)
@@ -53,9 +51,10 @@ class CoursesTaken(Base):
     customer: Mapped[Customer] = relationship(back_populates="courses_taken")
 
     def to_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        return dict(id=self.id, customer_id=self.customer_id, course_name=self.course_name, date_taken=self.date_taken.isoformat() if self.date_taken else None)
+    
 
-class ContactMethod(Base):
+class ContactMethod(db.Model):
     __tablename__ = "contact_methods"
 
     id          = mapped_column(Integer, primary_key=True)
@@ -67,4 +66,4 @@ class ContactMethod(Base):
     customer: Mapped[Customer] = relationship(back_populates="contact_methods")
 
     def to_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        return dict(id=self.id, customer_id=self.customer_id, type=self.type, value=self.value, is_primary=self.is_primary)

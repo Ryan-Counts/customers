@@ -14,7 +14,10 @@ def _decode_str(value):
     decoded = []
     for part, charset in parts:
         if isinstance(part, bytes):
-            decoded.append(part.decode(charset or "utf-8", errors="replace"))
+            safe_charset = charset or "utf-8"
+            if safe_charset.lower() in ("unknown-8bit", "unknown", "x-unknown"):
+                safe_charset = "utf-8"
+            decoded.append(part.decode(safe_charset, errors="replace"))
         else:
             decoded.append(part)
     return " ".join(decoded).strip()
@@ -93,7 +96,7 @@ def fetch_emails(folder="INBOX", limit=1000, only_unseen=False):
         cfg["IMAP_USER"],
         cfg["IMAP_PASSWORD"],
     )
-
+    print(f"Connected to IMAP server {cfg['IMAP_HOST']} as {cfg['IMAP_USER']}")
     try:
         mail.select(folder)
 
@@ -116,6 +119,8 @@ def fetch_emails(folder="INBOX", limit=1000, only_unseen=False):
                 continue
 
             raw = msg_data[0][1]
+            if isinstance(raw, int):
+                continue  # skip bad fetches):
             msg = email.message_from_bytes(raw)
 
             message_id = msg.get("Message-ID", "").strip()

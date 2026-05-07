@@ -10,11 +10,22 @@ function App() {
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
+  useEffect(() => {
+    APIService.fetchCustomers()
+      .then(data => setCustomers(data))
+      .catch(error => console.error('Error fetching customers:', error));
+  }, []);
+
+  const handleSelectCustomer = (customer) => {
+    console.log('Selected customer:', customer);
+    setSelectedCustomer(customer);
+  }
+
   return (
     <div className="app-container">
       <h1>Customer Manager</h1>
       <div className="main-content">
-        <CustomerList customers={customers} onSelectCustomer={setSelectedCustomer} />
+        <CustomerList customers={customers} selectedCustomer={selectedCustomer} handleSelectCustomer={handleSelectCustomer} />
       </div>
       <CustomerDetail customer={selectedCustomer} />
       <ImportPanel></ImportPanel>
