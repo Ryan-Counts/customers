@@ -139,9 +139,6 @@ def fetch_emails(folder="INBOX", limit=1000, only_unseen=False):
 
             addr = parsed["email"]
 
-            if addr in seen_addresses:
-                continue
-
             seen_addresses.add(addr)
 
             records.append({

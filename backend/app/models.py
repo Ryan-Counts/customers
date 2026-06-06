@@ -20,7 +20,7 @@ class Customer(db.Model):
     __tablename__ = "customers"
 
     id         = mapped_column(Integer, primary_key=True)
-    name       = mapped_column(String(200), nullable=False)
+    name       = mapped_column(String(200), unique=True, nullable=False)
     email      = mapped_column(String(200), unique=True, index=True)
     phone      = mapped_column(String(50))
     company    = mapped_column(String(200), index=True)
@@ -47,6 +47,7 @@ class CoursesTaken(db.Model):
     customer_id  = mapped_column(Integer, ForeignKey("customers.id"), nullable=False, index=True)
     course_name  = mapped_column(String(200), nullable=False)
     date_taken   = mapped_column(DateTime)
+    source       = mapped_column(String(50), default="unknown")
 
     customer: Mapped[Customer] = relationship(back_populates="courses_taken")
 

@@ -65,6 +65,18 @@ export default class APIService {
         });
     }
 
+    static importCustomersFiles() {
+        return fetch('/imports/files', {
+            method: 'POST',
+            headers: {}
+        })
+        .then(response => response.json())
+        .catch(error => {
+            console.error('Error importing customers:', error);
+            throw error;
+        });
+    }
+
     static getCoursesForCustomer(customerId) {
         return fetch(`/customers/getCustomerCourses/${customerId}`, {
             method: 'GET',
@@ -73,6 +85,18 @@ export default class APIService {
         .then(response => response.json())
         .catch(error => {
             console.error('Error fetching courses:', error);
+            throw error;
+        });
+    }
+
+    static reconcileCourses() {
+        return fetch('/imports/reconcile', {
+            method: 'POST',
+            headers: {}
+        })
+        .then(response => response.json())
+        .catch(error => {
+            console.error('Error reconciling courses:', error);
             throw error;
         });
     }

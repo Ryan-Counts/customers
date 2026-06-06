@@ -52,6 +52,23 @@ function ImportPanel() {
     );
   }
 
+  const handleImportFiles = () => {
+    setImportResult(null);
+    APIService.importCustomersFiles()
+    .then((response) =>
+      setImportResult({
+        success: response.success,
+        message: response.message
+      })
+    )
+    .catch((error) =>
+      setImportResult({
+        success: false,
+        message: 'Error importing customers: ' + error.message
+      })
+    );
+  }
+
     return (
         <div className="import-panel">
             <h2>Import Customers</h2>
@@ -63,6 +80,9 @@ function ImportPanel() {
             </button>
             <button onClick={handleImportCSV}>
                 Import from CSV
+            </button>
+            <button onClick={handleImportFiles}>
+                Import Files
             </button>
             {importResult && (
               <p className={importResult.success ? 'success' : 'error'}>

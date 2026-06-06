@@ -13,3 +13,6 @@ class config:
     IMAP_PORT     = int(os.getenv("IMAP_PORT", 993))
     IMAP_USER     = os.getenv("IMAP_USER")      # full email address
     IMAP_PASSWORD = os.getenv("IMAP_PASSWORD")
+
+    # File import
+    FILES_DIRECTORY = os.getenv("FILES_DIRECTORY", "files_to_import")
