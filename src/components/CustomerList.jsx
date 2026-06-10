@@ -9,6 +9,7 @@ const CustomerList = ({ customers, selectedCustomer, handleSelectCustomer }) => 
             <h2>Customer List</h2>
             <ul>
                 {customers.length > 0 ? (
+                    customers.sort((a,b) => a.name.localeCompare(b.name)),
                     customers.map((customer) => (
                         <li key={customer.id}>
                             <strong>{customer.name}</strong>

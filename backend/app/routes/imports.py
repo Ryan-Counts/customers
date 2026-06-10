@@ -3,12 +3,14 @@ from flask import Blueprint, jsonify
 from sqlalchemy import Null
 from ..ingestion.email_fetcher import fetch_emails
 from ..ingestion.file_importer import import_from_files, parse_pdf_filename
+from ..ingestion.csv_importer import parse_csv
 from ..models import Customer
 from ..models import CoursesTaken
 from ..database import db
 from dateutil import parser
 from pathlib import Path
 from flask import current_app
+from datetime import datetime
 import pypdf
 import re
 
@@ -45,6 +47,28 @@ def import_from_email():
     db.session.commit()
     return jsonify({"created": created, "skipped": skipped})
 
+def import_from_csv(filepath):
+    records = parse_csv(filepath)
+    created, skipped = 0, 0
+
+    for r in records:
+        if not r["email"]:
+            skipped += 1
+            continue
+
+        exists = db.session.execute(db.select(Customer).filter_by(email=r["email"])).first()
+        print(f"Processing CSV email {r['email']}: exists in DB? {'Yes' if exists else 'No'}")
+        if exists:
+            skipped += 1
+            continue
+
+        newCustomer = dict(name=r["name"] or None, email=r["email"], phone=r.get("phone") or None, company=r.get("company") or None, source="csv", source_ref=filepath)
+        db.session.add(Customer(**newCustomer))        
+        created += 1
+
+    print(f"CSV import: {created} created, {skipped} skipped")
+    db.session.commit()
+    return {"created": created, "skipped": skipped}
 
 def processCoursesTakenFromEmail():
     records = fetch_emails(limit=1400, only_unseen=False)  # adjust as needed
@@ -107,9 +131,24 @@ def processCoursesTakenFromFiles(file_records):
             skipped += 1
             continue
 
+        # Force proper spacing and casing on the name
+        if name:
+            parts = name.split()
+            name  = " ".join(p.title() for p in parts)
+
+        if isinstance(date_taken, str):
+            try:
+                date_taken = datetime.strptime(date_taken, "%Y-%m-%d").date()
+            except ValueError:
+                print(f"Invalid date format for '{date_taken}'. Setting date_taken to None.")
+                date_taken = None
+
         foundCustomer = db.session.execute(db.select(Customer).filter_by(name=name)).first()
-        
-        customerID = foundCustomer.id if foundCustomer else None
+        print(f"Looking up customer by name '{name}': found {'Yes' if foundCustomer else 'No'}")
+        if foundCustomer:
+            customerID = foundCustomer[0].id
+        else:
+            customerID = None
         
         if not customerID:
             print(f"Customer '{name}' not found for file record. Skipping.")
@@ -136,8 +175,10 @@ def import_email():
 
 @imports_bp.route("/csv", methods=["POST"])
 def import_csv():
-    # Implement CSV import logic here, similar to the email import.
-    return jsonify({"message": "CSV import not implemented yet"})
+    print("Starting CSV import...")
+    cfg = current_app.config
+    csvCustomers = import_from_csv(cfg["CSV_FILE_PATH"])
+    return jsonify(csvCustomers)
 
 @imports_bp.route("/db", methods=["POST"])
 def import_db():

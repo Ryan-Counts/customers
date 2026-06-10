@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "backend": "cd backend/app && flask run --debug"
   },
   "dependencies": {
     "react": "^19.2.5",

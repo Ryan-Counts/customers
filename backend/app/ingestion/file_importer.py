@@ -29,10 +29,12 @@ YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
 # ── Modern: periodic_ethics-_first_last_2026 ───────────────────────────────────
 MODERN_RE = re.compile(
     r"^(?P<course>[a-z]+(?:_[a-z]+)*)"  # course: lowercase words joined by underscores
-    r"-_"                                # literal separator between course and name
+    r"-_"                               # literal separator between course and name
     r"(?P<first>[a-z]+)"                # first name
+    r"(?:_(?P<middle>[a-z]+))??"          # optional middle name (lazy)
     r"_(?P<last>[a-z]+)"                # last name
-    r"_(?P<year>(19|20)\d{2})$",        # year at end
+    r"_(?P<year>(19|20)\d{2})$"         # year at end
+    r"[_\-\s]*\w*$",                    # <-- same trailing suffix allowance
     re.IGNORECASE
 )
 
@@ -40,8 +42,18 @@ MODERN_RE = re.compile(
 LEGACY_RE = re.compile(
     r"^(?P<first>[A-Z][a-z]+)"          # Firstname
     r"(?P<last>[A-Z][a-z]+)"            # Lastname
-    r"(?P<course>[A-Za-z]+?)"           # Course (non-greedy, no separators)
-    r"(?P<year>(19|20)\d{2})$"          # Year at end
+    r"(?P<course>"                      # Course — one of the known keywords
+        r"PeriodicEthics"
+        r"|InitialEthics"
+        r"|AMLMortgage"
+        r"|AMLRMLO"
+        r"|AMLMSB"
+        r"|AMLFutures"
+        r"|AML"
+        r"|Mortgage"
+    r")"
+    r"(?P<year>(19|20)\d{2})"          # Year at end
+    r"[_\-\s]*\w*$"                    # <-- allow optional trailing _1, -1, _copy etc.
 )
 
 # Handles formats like "December 1st, 2023" / "January 15th, 2022" etc.
@@ -57,6 +69,38 @@ def extract_name_from_text(text: str) -> str | None:
     m = NAME_RE.search(text)
     return m.group("name").strip() if m else None
 
+def extract_pdf_creation_date(pdf_path: Path) -> str | None:
+    try:
+        with open(pdf_path, "rb") as f:
+            reader = pypdf.PdfReader(f)
+            metadata = reader.metadata
+
+            if not metadata or not metadata.creation_date:
+                return None
+
+            dt = metadata.creation_date
+
+            # Some PDFs return a raw string instead of a datetime object
+            if isinstance(dt, str):
+                # Strip PDF date format prefix e.g. "D:20230101120000"
+                dt = dt.strip()
+                if dt.startswith("D:"):
+                    dt = dt[2:]
+                try:
+                    return datetime.strptime(dt[:8], "%Y%m%d").strftime("%Y-%m-%d")
+                except ValueError:
+                    return None
+
+            # Already a datetime object
+            if isinstance(dt, datetime):
+                return dt.strftime("%Y-%m-%d")
+
+            return None
+
+    except Exception as e:
+        print(f"WARNING: Could not extract metadata from {pdf_path.name}: {e}")
+        return None
+
 
 def process_pdf(filepath: str | Path) -> dict:
     path = Path(filepath)
@@ -67,15 +111,29 @@ def process_pdf(filepath: str | Path) -> dict:
     # Try to extract richer data from the text itself
     try:
         text = _extract_text(path)
+        
+        date_from_meta = extract_pdf_creation_date(path)
 
-        name_from_text = extract_name_from_text(text)
         date_from_text = extract_date(text)
+        
+        date_from_year = f"{parsed['year']}-01-01" if parsed.get("year") else None
 
-        # Prefer text-extracted values over filename-parsed ones
-        if name_from_text:
-            parsed["name"] = name_from_text
-        if date_from_text:
-            parsed["date_taken"] = date_from_text
+        def is_valid_date(val) -> bool:
+            if not isinstance(val, str):
+                return False
+            try:
+                datetime.strptime(val, "%Y-%m-%d")
+                return True
+            except ValueError:
+                return False
+
+        if not parsed.get("name"):
+            name_from_text = extract_name_from_text(text)
+            if name_from_text:
+                parsed["name"] = name_from_text
+        
+        parsed["date_taken"] = date_from_meta or date_from_text or date_from_year
+
 
     except Exception as e:
         print(f"WARNING: Could not extract text from {path.name}: {e}")
@@ -93,7 +151,7 @@ def import_from_files():
     created, skipped = 0, 0
     results = []
 
-    pdf_files = list(Path(directory).glob("**/*.pdf"))  # ** means search subdirectories too
+    pdf_files = list(Path(directory).glob("*.pdf"))  # ** means search subdirectories too
 
     print(f"Found {len(pdf_files)} PDF(s) in {directory}")
 
@@ -143,10 +201,17 @@ def parse_pdf_filename(filepath: str | Path) -> dict:
     # ── Modern ────────────────────────────────────────────────────────────────
     m = MODERN_RE.match(stem)
     if m:
+
+        first = m.group("first").capitalize()
+        middle = m.group("middle")
+        last = m.group("last").capitalize()
+
+        name = f"{first} {middle.capitalize()} {last}" if middle else f"{first} {last}"
+
         return {
             "filename": path.name,
             "format":   "modern",
-            "name":     f"{m.group('first').title()} {m.group('last').title()}",
+            "name":     name,
             "course":   normalize_course(m.group("course")),
             "year":     m.group("year"),
         }

@@ -55,7 +55,7 @@ export default class APIService {
 
     static importCustomersCSV() {
         return fetch('/imports/csv', {
-            method: 'GET',
+            method: 'POST',
             headers: {}
         })
         .then(response => response.json())

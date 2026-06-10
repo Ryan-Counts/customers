@@ -21,9 +21,9 @@ class Customer(db.Model):
 
     id         = mapped_column(Integer, primary_key=True)
     name       = mapped_column(String(200), unique=True, nullable=False)
-    email      = mapped_column(String(200), unique=True, index=True)
+    email      = mapped_column(String(200), index=True)
     phone      = mapped_column(String(50))
-    company    = mapped_column(String(200), index=True)
+    company    = mapped_column(String(200))
     status     = mapped_column(String(20), nullable=False, default="active")
     source     = mapped_column(String(50))
     source_ref = mapped_column(String(500))

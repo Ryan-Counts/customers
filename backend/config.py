@@ -16,3 +16,6 @@ class config:
 
     # File import
     FILES_DIRECTORY = os.getenv("FILES_DIRECTORY", "files_to_import")
+
+    # CSV import
+    CSV_FILE_PATH = os.getenv("CSV_FILE_PATH", "customers.csv")

@@ -20,20 +20,33 @@ def parse_csv(filepath):
 
     records = []
     seen_emails = set()
+    seen_names = set()
 
     with open(filepath, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
 
         for row in reader:
-            name = (row.get("Name") or "").strip()
-            email = (row.get("Email") or "").strip().lower()
-            company = (row.get("Company") or "").strip()
-            phone = (row.get("Phone") or "").strip()
+            firstName = row.get("FIRSTNAME") or ""
+            lastName = row.get("LASTNAME") or ""
+            if firstName == "" or lastName == "":
+                print(f"WARNING: Missing name in row: {row}")
+                continue
+            
+            firstName = firstName.capitalize()
+            lastName = lastName.capitalize()
+            name = (firstName + " " + lastName).strip()
+            email = (row.get("EMAIL") or "").strip().lower()
+            company = (row.get("COMPANY") or "").strip()
+            phone = (row.get("SMS") or "").strip()
 
             if not email or email in seen_emails:
                 continue
 
+            if not name or name in seen_names:
+                continue
+
             seen_emails.add(email)
+            seen_names.add(name)
 
             records.append({
                 "name": name or email,
