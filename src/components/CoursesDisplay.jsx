@@ -26,6 +26,7 @@ const CoursesDisplay = ({ customer }) => {
                         <div key={course.id}>
                             <li>{course.course_name}</li>
                             <li>{course.date_taken}</li>
+                            <li>{course.source}</li>
                         </div>
                     ))}
                 </ul>

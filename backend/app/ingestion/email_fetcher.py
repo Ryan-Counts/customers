@@ -3,7 +3,10 @@ import imaplib
 import email
 from email.header import decode_header
 from email.utils import parseaddr, getaddresses
+from datetime import datetime
 from flask import current_app
+from ..models import CustomerEmail, CoursesTakenEmail
+from ..database import db
 
 
 def _decode_str(value):
@@ -40,6 +43,7 @@ def _get_body(msg):
             return payload.decode(charset, errors="replace")
     return ""
 
+
 def parseCustomerInfo(body):
     data = {}
 
@@ -60,6 +64,7 @@ def parseCustomerInfo(body):
         "phone": data.get("phone #", ""),
         "course": data.get("course", ""),
     }
+
 
 def _parse_contacts(msg):
     """
@@ -87,7 +92,7 @@ def fetch_emails(folder="INBOX", limit=1000, only_unseen=False):
     Fetch emails from the configured IMAP account.
 
     Returns a list of dicts, one per unique sender address found,
-    shaped to match the Customer model's fields.
+    shaped to match the CustomerEmail staging model's fields.
     """
     cfg = current_app.config
     mail = connect(
@@ -120,11 +125,11 @@ def fetch_emails(folder="INBOX", limit=1000, only_unseen=False):
 
             raw = msg_data[0][1]
             if isinstance(raw, int):
-                continue  # skip bad fetches):
+                continue  # skip bad fetches
             msg = email.message_from_bytes(raw)
 
             message_id = msg.get("Message-ID", "").strip()
-            
+
             TARGET_SUBJECT = 'Walsh Agency "Sworn Declaration"'
 
             subject = _decode_str(msg.get("Subject", ""))
@@ -148,11 +153,10 @@ def fetch_emails(folder="INBOX", limit=1000, only_unseen=False):
                 "phone": parsed["phone"],
                 "course": parsed["course"],
                 "date_taken": msg.get("Date"),
-                "source": "email",
                 "source_ref": message_id,
                 "notes": f"Subject: {subject}",
             })
-            
+
         return records
 
     finally:
@@ -160,4 +164,53 @@ def fetch_emails(folder="INBOX", limit=1000, only_unseen=False):
             mail.logout()
         except Exception:
             pass
-    
+
+
+def _parse_email_date(raw_date):
+    """Best-effort parse of an RFC 2822 email Date header into a datetime."""
+    if not raw_date:
+        return None
+    try:
+        from email.utils import parsedate_to_datetime
+        return parsedate_to_datetime(raw_date)
+    except (TypeError, ValueError):
+        return None
+
+
+def save_email_records(records):
+    """
+    Take parsed email records (from fetch_emails) and write them into the
+    CustomerEmail / CoursesTakenEmail staging tables. Does NOT touch the
+    master tables -- that's reconcile_to_master.py's job.
+    """
+    created = 0
+    for rec in records:
+        customer = CustomerEmail(
+            name=rec.get("name"),
+            email=rec.get("email") or None,
+            phone=rec.get("phone") or None,
+            company=rec.get("company") or None,
+            source_ref=rec.get("source_ref"),
+            notes=rec.get("notes"),
+        )
+        db.session.add(customer)
+        db.session.flush()
+
+        course_name = rec.get("course")
+        if course_name:
+            db.session.add(CoursesTakenEmail(
+                customer_id=customer.id,
+                course_name=course_name,
+                date_taken=_parse_email_date(rec.get("date_taken")),
+            ))
+
+        created += 1
+
+    db.session.commit()
+    return created
+
+
+def import_from_email(folder="INBOX", limit=1000, only_unseen=False):
+    """Convenience wrapper: fetch from IMAP and persist to staging in one call."""
+    records = fetch_emails(folder=folder, limit=limit, only_unseen=only_unseen)
+    return save_email_records(records)

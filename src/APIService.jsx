@@ -89,7 +89,7 @@ export default class APIService {
         });
     }
 
-    static reconcileCourses() {
+    static reconcileCustomers() {
         return fetch('/imports/reconcile', {
             method: 'POST',
             headers: {}

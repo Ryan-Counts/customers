@@ -1,7 +1,17 @@
 # backend/app/ingestion/reconcile_courses.py
+#
+# NOTE: as of the staging-table rework, NEW imports no longer write straight
+# to the master tables -- reconcile_to_master.py's merge_courses() now uses
+# this same normalize+year-match+precision logic, so duplicates like the
+# ones this script cleans up shouldn't be created going forward.
+#
+# Keep this script around as a one-time cleanup utility for any
+# CoursesTakenMaster duplicates that already existed from BEFORE the
+# rework, or anything that slips through. Safe to run any time -- it only
+# removes true duplicates, never customers.
 from datetime import datetime
 from ..database import db
-from ..models import Customer, CoursesTaken
+from ..models import CustomerMaster, CoursesTakenMaster
 from sqlalchemy import func
 
 
@@ -12,7 +22,7 @@ def normalize_course_name(name: str) -> str:
 
 def reconcile_courses_taken():
     """
-    Deduplicates CoursesTaken records by merging file and email sources.
+    Deduplicates CoursesTakenMaster records by merging file and email sources.
     
     Priority rules:
     - If a file record and email record exist for the same customer + course,
@@ -23,10 +33,10 @@ def reconcile_courses_taken():
     """
     created, removed, kept = 0, 0, 0
     
-    all_customers = db.session.query(Customer).all()
+    all_customers = db.session.query(CustomerMaster).all()
 
     for customer in all_customers:
-        courses = db.session.query(CoursesTaken)\
+        courses = db.session.query(CoursesTakenMaster)\
             .filter_by(customer_id=customer.id)\
             .all()
 
@@ -34,7 +44,7 @@ def reconcile_courses_taken():
             continue
 
         # Group by normalized course name + year
-        groups: dict[tuple, list[CoursesTaken]] = {}
+        groups: dict[tuple, list[CoursesTakenMaster]] = {}
         for course in courses:
             year = course.date_taken.year if course.date_taken else None
             key = (normalize_course_name(course.course_name), year)
@@ -46,8 +56,8 @@ def reconcile_courses_taken():
                 continue  # no duplicate, nothing to do
 
             # Separate by source
-            file_records  = [c for c in group if c.source == "file"] if hasattr(CoursesTaken, 'source') else []
-            email_records = [c for c in group if c.source == "email"] if hasattr(CoursesTaken, 'source') else []
+            file_records  = [c for c in group if c.source == "file"] if hasattr(CoursesTakenMaster, 'source') else []
+            email_records = [c for c in group if c.source == "email"] if hasattr(CoursesTakenMaster, 'source') else []
 
             # If no source field, prefer records with a real date over year-only dates
             precise_records = [c for c in group if c.date_taken and
@@ -83,20 +93,20 @@ def find_file_only_courses():
     Diagnostic: find courses that came from files but have no matching email record.
     Useful for spotting certificates that were never emailed.
     """
-    all_courses = db.session.query(CoursesTaken).all()
+    all_courses = db.session.query(CoursesTakenMaster).all()
     results = []
 
     for course in all_courses:
         year = course.date_taken.year if course.date_taken else None
         
         # Look for a matching email-sourced course for the same customer + course + year
-        customer = db.session.query(Customer).filter_by(id=course.customer_id).first()
+        customer = db.session.query(CustomerMaster).filter_by(id=course.customer_id).first()
         if not customer:
             continue
 
-        siblings = db.session.query(CoursesTaken).filter(
-            CoursesTaken.customer_id == course.customer_id,
-            func.lower(CoursesTaken.course_name) == normalize_course_name(course.course_name)
+        siblings = db.session.query(CoursesTakenMaster).filter(
+            CoursesTakenMaster.customer_id == course.customer_id,
+            func.lower(CoursesTakenMaster.course_name) == normalize_course_name(course.course_name)
         ).all()
 
         same_year = [s for s in siblings if s.date_taken and s.date_taken.year == year and s.id != course.id]

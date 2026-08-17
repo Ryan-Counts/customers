@@ -69,6 +69,23 @@ function ImportPanel() {
     );
   }
 
+  const handleReconciliation = () => {
+    setImportResult(null);
+    APIService.reconcileCustomers()
+    .then((response) =>
+      setImportResult({
+        success: response.success,
+        message: response.message
+      })
+    )
+    .catch((error) =>
+      setImportResult({
+        success: false,
+        message: 'Error reconciling customers: ' + error.message
+      })
+    );
+  }
+
     return (
         <div className="import-panel">
             <h2>Import Customers</h2>
@@ -83,6 +100,9 @@ function ImportPanel() {
             </button>
             <button onClick={handleImportFiles}>
                 Import Files
+            </button>
+            <button onClick={handleReconciliation}>
+                Reconcile Customers
             </button>
             {importResult && (
               <p className={importResult.success ? 'success' : 'error'}>

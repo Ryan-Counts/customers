@@ -4,6 +4,7 @@ from flask import current_app, jsonify
 import pypdf
 from datetime import datetime
 from ..database import db
+from ..models import CustomerPDF, CoursesTakenPDF
 
 # ── Course Aliases ─────────────────────────────────────────────────────────────
 COURSE_ALIASES = [
@@ -141,6 +142,43 @@ def process_pdf(filepath: str | Path) -> dict:
 
     return parsed
 
+def _parse_date_taken(date_str):
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+def save_pdf_record(parsed):
+    """
+    Take one parsed PDF record (from process_pdf) and write it into the
+    CustomerPDF / CoursesTakenPDF staging tables. Does NOT touch the
+    master tables -- that's reconcile_to_master.py's job.
+    """
+    customer = CustomerPDF(
+        name=parsed.get("name"),
+        email=parsed.get("email") or None,
+        company=parsed.get("company") or None,
+        source_ref=parsed.get("filename"),
+        notes=f"format={parsed.get('format')}",
+    )
+    db.session.add(customer)
+    db.session.flush()
+
+    course_name = parsed.get("course")
+    if course_name:
+        db.session.add(CoursesTakenPDF(
+            customer_id=customer.id,
+            course_name=course_name,
+            date_taken=_parse_date_taken(parsed.get("date_taken")),
+        ))
+
+    db.session.commit()
+    return customer
+
+
 def import_from_files():
     cfg = current_app.config
     directory = cfg.get("FILES_DIRECTORY", "files_to_import")
@@ -158,12 +196,16 @@ def import_from_files():
     for pdf_path in pdf_files:
         try:
             result = process_pdf(pdf_path)
+            save_pdf_record(result)
             results.append(result)
+            created += 1
             print(f"Processed: {pdf_path.name} -> {result}")
         except Exception as e:
             print(f"Failed to process {pdf_path.name}: {e}")
+            skipped += 1
             continue
-    
+
+    print(f"Imported {created} PDF(s) into staging, skipped {skipped}")
     return results
 
 def _extract_text(pdf_path: Path) -> str:
@@ -242,5 +284,3 @@ def parse_pdf_filename(filepath: str | Path) -> dict:
         "course":   course,
         "year":     year_match.group() if year_match else None,
     }
-
-

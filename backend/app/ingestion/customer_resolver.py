@@ -1,4 +1,4 @@
-from ..models import Customer, CustomerEmail
+from ..models import CustomerMaster, CustomerEmailAddress
 from ..database import db
 
 
@@ -6,20 +6,20 @@ def normalize_name(name: str) -> str:
     return " ".join(p.strip().title() for p in name.split()) if name else ""
 
 
-def find_customer_by_email(email: str) -> Customer | None:
-    email_record = db.session.query(CustomerEmail).filter_by(email=email.lower()).first()
+def find_customer_by_email(email: str) -> CustomerMaster | None:
+    email_record = db.session.query(CustomerEmailAddress).filter_by(email=email.lower()).first()
     return email_record.customer if email_record else None
 
 
-def find_customer_by_name(name: str) -> Customer | None:
-    return db.session.query(Customer).filter(
-        db.func.lower(Customer.name) == normalize_name(name).lower()
+def find_customer_by_name(name: str) -> CustomerMaster | None:
+    return db.session.query(CustomerMaster).filter(
+        db.func.lower(CustomerMaster.name) == normalize_name(name).lower()
     ).first()
 
 
-def add_email_to_customer(customer: Customer, email: str, source: str = "email", make_primary: bool = False) -> CustomerEmail:
+def add_email_to_customer(customer: CustomerMaster, email: str, source: str = "email", make_primary: bool = False) -> CustomerEmailAddress:
     """Add an email to a customer if it doesn't already exist."""
-    existing = db.session.query(CustomerEmail).filter_by(email=email.lower()).first()
+    existing = db.session.query(CustomerEmailAddress).filter_by(email=email.lower()).first()
     if existing:
         return existing  # already attached, nothing to do
 
@@ -27,7 +27,7 @@ def add_email_to_customer(customer: Customer, email: str, source: str = "email",
     if not customer.emails:
         make_primary = True
 
-    email_record = CustomerEmail(
+    email_record = CustomerEmailAddress(
         customer_id=customer.id,
         email=email.lower(),
         is_primary=make_primary,
@@ -37,14 +37,22 @@ def add_email_to_customer(customer: Customer, email: str, source: str = "email",
     return email_record
 
 
-def resolve_or_create_customer(name: str, email: str | None, source: str = "email", **kwargs) -> tuple[Customer, bool]:
+def resolve_or_create_customer(name: str, email: str | None, source: str = "email", **kwargs) -> tuple[CustomerMaster, bool]:
     """
-    Find or create a customer using the following priority:
+    Find or create a MASTER customer using the following priority:
     1. Look up by email — if found, return that customer
     2. Look up by name  — if found, add the email to that customer
     3. Neither found    — create a new customer with this email
 
     Returns (customer, was_created).
+
+    NOTE: with the staging-table rework, your ingestion routes (imports.py)
+    no longer call this during import -- raw rows land in CustomerCSV /
+    CustomerEmail / CustomerPDF staging instead, and reconcile_to_master.py
+    handles dedup/merge into the master tables. This function is still here
+    in case something else (manual customer creation in the admin UI, an
+    API endpoint, etc.) calls it directly against the master tables. If
+    nothing else calls it, it's safe to retire.
     """
     name = normalize_name(name)
 
@@ -62,7 +70,7 @@ def resolve_or_create_customer(name: str, email: str | None, source: str = "emai
             return customer, False
 
     # 3. Create new customer
-    customer = Customer(name=name, source=source, **kwargs)
+    customer = CustomerMaster(name=name, source=source, **kwargs)
     db.session.add(customer)
     db.session.flush()  # get the ID before adding email
 

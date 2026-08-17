@@ -22,9 +22,16 @@ def create_app():
     db.init_app(app)
 
     with app.app_context():
-        from .models import Customer
-        from .models import CoursesTaken
+        from .models import CustomerMaster
+        from .models import CoursesTakenMaster
+        from .models import CustomerEmailAddress
+        from .models import CustomerCSV
+        from .models import CoursesTakenCSV
         from .models import ContactMethod
+        from .models import CustomerEmail
+        from .models import CoursesTakenEmail
+        from .models import CustomerPDF
+        from .models import CoursesTakenPDF
         db.create_all()
 
     app.register_blueprint(imports_bp, url_prefix="/imports")
