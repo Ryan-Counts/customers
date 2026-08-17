@@ -186,12 +186,12 @@ def save_email_records(records):
     created = 0
     for rec in records:
         customer = CustomerEmail(
-            name=rec.get("name"),
-            email=rec.get("email") or None,
-            phone=rec.get("phone") or None,
-            company=rec.get("company") or None,
-            source_ref=rec.get("source_ref"),
-            notes=rec.get("notes"),
+            name=rec.get("name"), #type: ignore
+            email=rec.get("email") or None, #type: ignore
+            phone=rec.get("phone") or None, #type: ignore
+            company=rec.get("company") or None, #type: ignore
+            source_ref=rec.get("source_ref"), #type: ignore
+            notes=rec.get("notes"), #type: ignore
         )
         db.session.add(customer)
         db.session.flush()
@@ -199,9 +199,9 @@ def save_email_records(records):
         course_name = rec.get("course")
         if course_name:
             db.session.add(CoursesTakenEmail(
-                customer_id=customer.id,
-                course_name=course_name,
-                date_taken=_parse_email_date(rec.get("date_taken")),
+                customer_id=customer.id, #type: ignore
+                course_name=course_name, #type: ignore
+                date_taken=_parse_email_date(rec.get("date_taken")), #type: ignore
             ))
 
         created += 1
